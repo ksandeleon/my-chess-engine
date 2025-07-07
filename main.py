@@ -127,6 +127,15 @@ def get_square_under_mouse():
     return 7 - row, col  # Convert to chess rank, file
 
 
+def get_move_history_san(move_stack):
+    temp_board = chess.Board()
+    san_moves = []
+    for move in move_stack:
+        san_moves.append(temp_board.san(move))
+        temp_board.push(move)
+    return san_moves
+
+
 def main():
     board = chess.Board()
     clock = pygame.time.Clock()
@@ -140,7 +149,7 @@ def main():
 
         draw_board(selected_square, last_move)
         draw_pieces(board)
-        draw_move_history([board.san(mv) for mv in board.move_stack])
+        draw_move_history(get_move_history_san(board.move_stack))
         pygame.display.flip()
 
         if board.turn == chess.BLACK and not board.is_game_over():
@@ -153,10 +162,13 @@ def main():
                 running = False
 
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_u and len(board.move_stack) >= 1:
-                    board.pop()  # AI move
-                    if board.turn == chess.WHITE and len(board.move_stack) >= 1:
-                        board.pop()  # Player move
+                if event.key == pygame.K_u:
+                    # Undo AI move (if exists)
+                    if len(board.move_stack) >= 1:
+                        board.pop()
+                    # Undo Player move (if exists)
+                    if len(board.move_stack) >= 1:
+                        board.pop()
                     selected_square = None
 
             elif event.type == pygame.MOUSEBUTTONDOWN and board.turn == player_turn:
