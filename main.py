@@ -45,7 +45,7 @@ def evaluate_board(board):
                 score -= value
     return score  # Positive is good for white, negative for black
 
-def minimax(board, depth, maximizing_player):
+def minimax(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or board.is_game_over():
         return evaluate_board(board), None
 
@@ -55,22 +55,29 @@ def minimax(board, depth, maximizing_player):
         max_eval = float('-inf')
         for move in board.legal_moves:
             board.push(move)
-            eval, _ = minimax(board, depth - 1, False)
+            eval, _ = minimax(board, depth - 1, alpha, beta, False)
             board.pop()
             if eval > max_eval:
                 max_eval = eval
                 best_move = move
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break  # Beta cut-off
         return max_eval, best_move
     else:
         min_eval = float('inf')
         for move in board.legal_moves:
             board.push(move)
-            eval, _ = minimax(board, depth - 1, True)
+            eval, _ = minimax(board, depth - 1, alpha, beta, True)
             board.pop()
             if eval < min_eval:
                 min_eval = eval
                 best_move = move
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break  # Alpha cut-off
         return min_eval, best_move
+
 
 def draw_board(selected_square=None):
     for row in range(8):
@@ -112,7 +119,7 @@ def main():
 
         if board.turn == chess.BLACK and not board.is_game_over():
             # AI's turn: make a random move
-            _, move = minimax(board, 2, False)  # depth=2, False means AI is minimizing
+            _, move = minimax(board, 3, float('-inf'), float('inf'), False)  # AI is minimizing
             if move:
                 board.push(move)
 
