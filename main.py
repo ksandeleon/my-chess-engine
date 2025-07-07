@@ -8,6 +8,14 @@ SQUARE_SIZE = WIDTH // 8
 WHITE = (240, 217, 181)
 GRAY = (181, 136, 99)
 HIGHLIGHT = (186, 202, 43)
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0
+}
 
 # Initialize Pygame
 pygame.init()
@@ -22,6 +30,47 @@ for color in ['w', 'b']:
         filename = f'assets/pieces/alpha/alpha/{color}{piece}.svg'
         image = pygame.image.load(filename)
         PIECES[color + piece] = pygame.transform.scale(image, (SQUARE_SIZE, SQUARE_SIZE))
+
+
+
+def evaluate_board(board):
+    score = 0
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece:
+            value = PIECE_VALUES[piece.piece_type]
+            if piece.color == chess.WHITE:
+                score += value
+            else:
+                score -= value
+    return score  # Positive is good for white, negative for black
+
+def minimax(board, depth, maximizing_player):
+    if depth == 0 or board.is_game_over():
+        return evaluate_board(board), None
+
+    best_move = None
+
+    if maximizing_player:
+        max_eval = float('-inf')
+        for move in board.legal_moves:
+            board.push(move)
+            eval, _ = minimax(board, depth - 1, False)
+            board.pop()
+            if eval > max_eval:
+                max_eval = eval
+                best_move = move
+        return max_eval, best_move
+    else:
+        min_eval = float('inf')
+        for move in board.legal_moves:
+            board.push(move)
+            eval, _ = minimax(board, depth - 1, True)
+            board.pop()
+            if eval < min_eval:
+                min_eval = eval
+                best_move = move
+        return min_eval, best_move
 
 def draw_board(selected_square=None):
     for row in range(8):
@@ -63,8 +112,9 @@ def main():
 
         if board.turn == chess.BLACK and not board.is_game_over():
             # AI's turn: make a random move
-            move = random.choice(list(board.legal_moves))
-            board.push(move)
+            _, move = minimax(board, 2, False)  # depth=2, False means AI is minimizing
+            if move:
+                board.push(move)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
