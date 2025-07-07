@@ -1,6 +1,5 @@
 import pygame
 import chess
-import random
 
 # Constants
 WIDTH, HEIGHT = 640, 640
@@ -8,6 +7,8 @@ SQUARE_SIZE = WIDTH // 8
 WHITE = (240, 217, 181)
 GRAY = (181, 136, 99)
 HIGHLIGHT = (186, 202, 43)
+LAST_MOVE_COLOR = (246, 246, 105)
+
 PIECE_VALUES = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -21,6 +22,7 @@ PIECE_VALUES = {
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("KSAN CHESS")
+font = pygame.font.SysFont("arial", 18)
 
 # Load images
 PIECES = {}
@@ -32,18 +34,15 @@ for color in ['w', 'b']:
         PIECES[color + piece] = pygame.transform.scale(image, (SQUARE_SIZE, SQUARE_SIZE))
 
 
-
 def evaluate_board(board):
     score = 0
     for square in chess.SQUARES:
         piece = board.piece_at(square)
         if piece:
             value = PIECE_VALUES[piece.piece_type]
-            if piece.color == chess.WHITE:
-                score += value
-            else:
-                score -= value
-    return score  # Positive is good for white, negative for black
+            score += value if piece.color == chess.WHITE else -value
+    return score
+
 
 def minimax(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or board.is_game_over():
@@ -62,7 +61,7 @@ def minimax(board, depth, alpha, beta, maximizing_player):
                 best_move = move
             alpha = max(alpha, eval)
             if beta <= alpha:
-                break  # Beta cut-off
+                break
         return max_eval, best_move
     else:
         min_eval = float('inf')
@@ -75,18 +74,31 @@ def minimax(board, depth, alpha, beta, maximizing_player):
                 best_move = move
             beta = min(beta, eval)
             if beta <= alpha:
-                break  # Alpha cut-off
+                break
         return min_eval, best_move
 
 
-def draw_board(selected_square=None):
+def draw_board(selected_square=None, last_move=None):
     for row in range(8):
         for col in range(8):
             color = WHITE if (row + col) % 2 == 0 else GRAY
             rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
             pygame.draw.rect(screen, color, rect)
-            if selected_square == (row, col):
-                pygame.draw.rect(screen, HIGHLIGHT, rect, 4)
+
+    # Highlight selected square
+    if selected_square:
+        row, col = selected_square
+        pygame.draw.rect(screen, HIGHLIGHT, pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE), 4)
+
+    # Highlight last move
+    if last_move:
+        start = last_move.from_square
+        end = last_move.to_square
+        for sq in [start, end]:
+            row = 7 - chess.square_rank(sq)
+            col = chess.square_file(sq)
+            pygame.draw.rect(screen, LAST_MOVE_COLOR, pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+
 
 def draw_pieces(board):
     for square in chess.SQUARES:
@@ -99,33 +111,53 @@ def draw_pieces(board):
             image = PIECES[color + symbol]
             screen.blit(image, pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
+
+def draw_move_history(history):
+    x_offset = WIDTH + 10
+    y_offset = 10
+    for i, move in enumerate(history[-10:]):  # Last 10 moves
+        text = font.render(f"{i + 1 + max(0, len(history)-10)}. {move}", True, (0, 0, 0))
+        screen.blit(text, (10, HEIGHT - 150 + i * 15))
+
+
 def get_square_under_mouse():
     x, y = pygame.mouse.get_pos()
     col = x // SQUARE_SIZE
     row = y // SQUARE_SIZE
-    return 7 - row, col  # chess rank, file
+    return 7 - row, col  # Convert to chess rank, file
+
 
 def main():
     board = chess.Board()
     clock = pygame.time.Clock()
     selected_square = None
+    move_history = []
     running = True
-    player_turn = chess.WHITE  # human plays white
+    player_turn = chess.WHITE
 
     while running:
-        draw_board(selected_square)
+        last_move = board.move_stack[-1] if board.move_stack else None
+
+        draw_board(selected_square, last_move)
         draw_pieces(board)
+        draw_move_history([board.san(mv) for mv in board.move_stack])
         pygame.display.flip()
 
         if board.turn == chess.BLACK and not board.is_game_over():
-            # AI's turn: make a random move
-            _, move = minimax(board, 3, float('-inf'), float('inf'), False)  # AI is minimizing
+            _, move = minimax(board, 3, float('-inf'), float('inf'), False)
             if move:
                 board.push(move)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_u and len(board.move_stack) >= 1:
+                    board.pop()  # AI move
+                    if board.turn == chess.WHITE and len(board.move_stack) >= 1:
+                        board.pop()  # Player move
+                    selected_square = None
 
             elif event.type == pygame.MOUSEBUTTONDOWN and board.turn == player_turn:
                 rank, file = get_square_under_mouse()
@@ -146,6 +178,7 @@ def main():
         clock.tick(30)
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
