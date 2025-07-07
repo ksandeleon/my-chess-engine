@@ -1,5 +1,6 @@
 import pygame
 import chess
+import random
 
 # Constants
 WIDTH, HEIGHT = 640, 640
@@ -46,40 +47,44 @@ def get_square_under_mouse():
     x, y = pygame.mouse.get_pos()
     col = x // SQUARE_SIZE
     row = y // SQUARE_SIZE
-    return 7 - row, col  # return chess rank, file
+    return 7 - row, col  # chess rank, file
 
 def main():
     board = chess.Board()
     clock = pygame.time.Clock()
     selected_square = None
     running = True
+    player_turn = chess.WHITE  # human plays white
 
     while running:
         draw_board(selected_square)
         draw_pieces(board)
         pygame.display.flip()
 
+        if board.turn == chess.BLACK and not board.is_game_over():
+            # AI's turn: make a random move
+            move = random.choice(list(board.legal_moves))
+            board.push(move)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN and board.turn == player_turn:
                 rank, file = get_square_under_mouse()
                 clicked_square = chess.square(file, rank)
 
                 if selected_square is None:
-                    # First click - select piece
                     piece = board.piece_at(clicked_square)
-                    if piece and piece.color == board.turn:
-                        selected_square = (7 - rank, file)  # for highlighting
+                    if piece and piece.color == player_turn:
+                        selected_square = (7 - rank, file)
                         start_square = clicked_square
                 else:
-                    # Second click - try move
                     end_square = clicked_square
                     move = chess.Move(start_square, end_square)
                     if move in board.legal_moves:
                         board.push(move)
-                    selected_square = None  # reset selection
+                    selected_square = None
 
         clock.tick(30)
 
