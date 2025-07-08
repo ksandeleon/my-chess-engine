@@ -136,6 +136,43 @@ def get_move_history_san(move_stack):
     return san_moves
 
 
+def draw_promotion_ui(color):
+    # Draw a simple promotion selection box in the center
+    pieces = ['q', 'r', 'b', 'n']
+    box_width = 60
+    box_height = 60
+    x = WIDTH // 2 - 2 * box_width
+    y = HEIGHT // 2 - box_height // 2
+    for i, p in enumerate(pieces):
+        rect = pygame.Rect(x + i * (box_width + 10), y, box_width, box_height)
+        pygame.draw.rect(screen, (200, 200, 200), rect)
+        pygame.draw.rect(screen, (0, 0, 0), rect, 2)
+        img = PIECES[color + p.upper()]
+        screen.blit(img, rect)
+    pygame.display.flip()
+
+
+def get_promotion_choice(color):
+    # Wait for user to click on a promotion piece
+    pieces = ['q', 'r', 'b', 'n']
+    box_width = 60
+    box_height = 60
+    x = WIDTH // 2 - 2 * box_width
+    y = HEIGHT // 2 - box_height // 2
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = pygame.mouse.get_pos()
+                for i in range(4):
+                    rect = pygame.Rect(x + i * (box_width + 10), y, box_width, box_height)
+                    if rect.collidepoint(mx, my):
+                        return pieces[i]
+        pygame.time.wait(10)
+
+
 def main():
     board = chess.Board()
     clock = pygame.time.Clock()
@@ -143,18 +180,38 @@ def main():
     move_history = []
     running = True
     player_turn = chess.WHITE
+    game_result = None
 
     while running:
         last_move = board.move_stack[-1] if board.move_stack else None
 
+        # Check for game over (checkmate or stalemate)
+        if not game_result and board.is_game_over():
+            if board.is_checkmate():
+                winner = "Black" if board.turn == chess.WHITE else "White"
+                game_result = f"Checkmate! {winner} wins."
+            elif board.is_stalemate():
+                game_result = "Draw by stalemate."
+            else:
+                game_result = "Draw."
+
         draw_board(selected_square, last_move)
         draw_pieces(board)
         draw_move_history(get_move_history_san(board.move_stack))
+
+        # Draw game result if game is over
+        if game_result:
+            result_text = font.render(game_result, True, (200, 0, 0))
+            screen.blit(result_text, (WIDTH // 2 - result_text.get_width() // 2, HEIGHT // 2 - 20))
+
         pygame.display.flip()
 
         if board.turn == chess.BLACK and not board.is_game_over():
             _, move = minimax(board, 3, float('-inf'), float('inf'), False)
             if move:
+                # If AI move is a promotion, promote to queen
+                if board.piece_at(move.from_square) and board.piece_at(move.from_square).piece_type == chess.PAWN and (chess.square_rank(move.to_square) == 0 or chess.square_rank(move.to_square) == 7):
+                    move = chess.Move(move.from_square, move.to_square, promotion=chess.QUEEN)
                 board.push(move)
 
         for event in pygame.event.get():
@@ -184,6 +241,14 @@ def main():
                     end_square = clicked_square
                     move = chess.Move(start_square, end_square)
                     if move in board.legal_moves:
+                        # Check for pawn promotion
+                        if board.piece_at(start_square).piece_type == chess.PAWN and (chess.square_rank(end_square) == 0 or chess.square_rank(end_square) == 7):
+                            # Draw promotion UI
+                            draw_board(selected_square, last_move)
+                            draw_pieces(board)
+                            draw_promotion_ui('w')
+                            promo = get_promotion_choice('w')
+                            move = chess.Move(start_square, end_square, promotion={'q': chess.QUEEN, 'r': chess.ROOK, 'b': chess.BISHOP, 'n': chess.KNIGHT}[promo])
                         board.push(move)
                     selected_square = None
 
